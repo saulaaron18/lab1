@@ -48,14 +48,18 @@ public class ActaNotasImpl implements ActaNotas{
 
 	@Override
 	public ActaNotas addCalificacion(String nombre, String matricula, String grupo, double nota) {
-		if(nombre==null || matricula==null || grupo==null) {
+		if(nombre==null || matricula==null || grupo==null || nota<0.0 || nota>10.0) {
 			throw new IllegalArgumentException();
 		}	
-		if(getCalificacion(matricula)!=null) {
+		if(buscarMatricula(matricula)!=-1) {
 			throw new IllegalStateException();
 		}
+		int idx=0;
+		while(idx<calificaciones.size()&&matricula.compareTo(calificaciones.get(idx).matricula())>0) {
+			idx++;
+		}
+		calificaciones.add(idx, new Calificacion(nombre, matricula, grupo, nota));
 
-		calificaciones.add(calificaciones.size(), new Calificacion(nombre, matricula, grupo, nota));
 		return this;
 	}
 
@@ -65,13 +69,11 @@ public class ActaNotasImpl implements ActaNotas{
 			throw new IllegalArgumentException();
 		}
 		Calificacion calificacion = null;
+		int pos = this.buscarMatricula(matricula);
 
-		for(int idx=0;idx<calificaciones.size();idx++) {
-			if(calificaciones.get(idx).matricula.equals(matricula)) {
-				calificacion = calificaciones.get(idx);
-				break;
-			}
-		}
+		if(pos!=-1)
+			calificacion=this.calificaciones.get(pos);
+
 
 		return calificacion;
 	}
@@ -81,13 +83,11 @@ public class ActaNotasImpl implements ActaNotas{
 		if(calificacion==null) {
 			throw new IllegalArgumentException();
 		}
-		Calificacion calificacionAntigua = getCalificacion(calificacion.matricula);
+		int pos = buscarMatricula(calificacion.matricula());
 
-		if(calificacionAntigua == null) {
-			throw new IllegalStateException();
-		}
+		if (pos == -1) throw new IllegalStateException();
 
-		calificaciones.set(calificaciones.indexOf(calificacionAntigua), calificacion);
+		calificaciones.set(pos, calificacion);
 
 		return this;
 	}
@@ -97,13 +97,9 @@ public class ActaNotasImpl implements ActaNotas{
 		if(matricula == null) {
 			throw new IllegalArgumentException();
 		}
-		Calificacion calificacion = getCalificacion(matricula);
-
-		if(calificacion == null) {
-			throw new IllegalStateException();
-		}
-
-		calificaciones.remove(calificacion);
+		int pos = buscarMatricula(matricula);
+		if (pos == -1) throw new IllegalStateException();
+		calificaciones.removeElementAt(pos);
 		return this;
 	}
 
@@ -112,13 +108,13 @@ public class ActaNotasImpl implements ActaNotas{
 		if(calificaciones.isEmpty()) {
 			throw new IllegalStateException();
 		}
-		
+
 		double sum = 0;
-		
+
 		for(Calificacion calificacion : calificaciones) {
 			sum += calificacion.nota;
 		}
-		
+
 		return sum/calificaciones.size();
 	}
 
@@ -134,7 +130,7 @@ public class ActaNotasImpl implements ActaNotas{
 				map.put(calificacion.grupo, 1);
 			}
 		}
-		
+
 		int i=0;
 		for(String grupo : map.keys()) {
 			lista.add(i++, new Pair<>(grupo,map.get(grupo)));
@@ -147,26 +143,33 @@ public class ActaNotasImpl implements ActaNotas{
 	public IndexedList<Calificacion> getCalificaciones(Function<Calificacion, Boolean> filter,
 			Comparator<Calificacion> cmp) {
 		IndexedList<Calificacion> listCalificaciones = new ArrayIndexedList<>();
-		
-		 if(filter==null) {
-			 filter = t -> true;
-		 }
-		 if(cmp==null) {
-			 cmp = (o1, o2) -> o1.matricula.compareTo(o2.matricula);
-		 }
-		 
-		for(Calificacion calificacion : calificaciones) {
-			if(filter.apply(calificacion)) {
-				int idx=0;
-				while(idx<listCalificaciones.size() &&
-						cmp.compare(listCalificaciones.get(idx), calificacion) <= 0) {
-					idx++;
+
+		if(filter==null) {
+			filter = t -> true;
+		}
+
+		boolean yaOrdenado = (cmp == null);
+
+		if(!yaOrdenado) {
+			for(Calificacion calificacion : calificaciones) {
+				if(filter.apply(calificacion)) {
+					int idx=0;
+					while(idx<listCalificaciones.size() &&
+							cmp.compare(listCalificaciones.get(idx), calificacion) <= 0) {
+						idx++;
+					}
+
+					listCalificaciones.add(idx, calificacion);
 				}
-				
-				listCalificaciones.add(idx, calificacion);
+			}
+		}else {
+			for(Calificacion calificacion : calificaciones) {
+				if(filter.apply(calificacion)) {
+					listCalificaciones.add(listCalificaciones.size(), calificacion);
+				}
 			}
 		}
-		
+
 		return listCalificaciones;
 	}
 
@@ -184,14 +187,29 @@ public class ActaNotasImpl implements ActaNotas{
 
 	@Override
 	public String toString() {
-		String result = "";
-		
-		for(Calificacion calificacion : calificaciones) {
-			result += calificacion+"\n";
-		}
-		
 		return "Asignatura: "+asignatura+"\nNota Minima: "+notaMin+"\nAño: "+anyo+
-				"\nEs extraordinaria"+esExtraordinaria+"\nCalificaciones:\n"+result;
+				"\nEs extraordinaria"+esExtraordinaria+"\nCalificaciones:\n";
 	}
+
+	private int buscarMatricula(String matricula) {
+		int low = 0;
+		int high = calificaciones.size() - 1;
+
+		while (low <= high) {
+			int mid = (low + high) / 2;
+			int cmp = calificaciones.get(mid).matricula().compareTo(matricula);
+
+			if (cmp == 0) {
+				return mid;
+			} else if (cmp < 0) {
+				low = mid + 1;
+			} else {
+				high = mid - 1;
+			}
+		}
+		return -1;
+	}
+
+
 
 }
